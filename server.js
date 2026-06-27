@@ -29,7 +29,7 @@ passport.use(new GoogleStrategy(
   {
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: `${process.env.CALLBACK_URL || 'http://localhost:3000'}/auth/google/callback`
+    callbackURL: `${process.env.CALLBACK_URL || 'http://localhost:3000'}/api/auth/callback/google`
   },
   (accessToken, refreshToken, profile, done) => {
     const allowedEmails = (process.env.ALLOWED_EMAILS || 'tedcha@gmail.com').split(',').map(e => e.trim());
@@ -69,10 +69,10 @@ app.get('/auth/google',
   passport.authenticate('google', { scope: ['profile', 'email'] })
 );
 
-app.get('/auth/google/callback',
+app.get('/api/auth/callback/google',
   passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
-    res.json({ message: 'Authenticated!', user: req.user.emails[0].value });
+    res.redirect('/');
   }
 );
 
