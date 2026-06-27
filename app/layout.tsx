@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "Library Checkouts",
@@ -13,9 +14,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body style={{ fontFamily: "system-ui, sans-serif" }}>
-        <main style={{ maxWidth: "800px", margin: "0 auto", padding: "20px" }}>
-          {children}
-        </main>
+        <Providers>
+          <main style={{ maxWidth: "800px", margin: "0 auto", padding: "20px" }}>
+            {children}
+          </main>
+        </Providers>
       </body>
     </html>
   );
