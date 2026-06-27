@@ -1,6 +1,6 @@
 'use server';
 
-import type { Browser } from "playwright";
+import { chromium, type Browser } from "playwright";
 
 const LIBRARY_BASE_URL = "https://catalog.chappaqualibrary.org";
 const LOGIN_URL = `${LIBRARY_BASE_URL}/MyAccount/Login`;
@@ -20,30 +20,29 @@ let browser: Browser | null = null;
 async function getBrowser(): Promise<Browser> {
   if (!browser) {
     console.log("Launching Chromium browser with cloakbrowser (stealth mode)...");
-    // Dynamically import cloakbrowser to avoid bundling server-only dependencies
-    let cloakbrowserModule: any;
     try {
-      cloakbrowserModule = await import("cloakbrowser");
-      console.log("Cloakbrowser imported successfully, launch function:", typeof cloakbrowserModule.launch);
-    } catch (e) {
-      // Fallback to regular playwright if cloakbrowser fails
-      console.log("Cloakbrowser import failed:", e instanceof Error ? e.message : String(e));
-      console.log("Falling back to playwright");
-      const { chromium } = await import("playwright");
-      browser = await chromium.launch({
+      const cloakbrowserModule = require("cloakbrowser");
+      console.log("Cloakbrowser required successfully");
+      browser = await cloakbrowserModule.launch({
         headless: true,
-        args: ["--disable-dev-shm-usage", "--disable-blink-features=AutomationControlled"],
+        args: ["--disable-dev-shm-usage"],
       });
-      console.log("Browser launched successfully (playwright fallback)");
-      return browser!;
+      console.log("✅ Browser launched successfully with cloakbrowser");
+    } catch (e) {
+      console.log("❌ Cloakbrowser failed:", e instanceof Error ? e.message : String(e));
+      console.log("Falling back to playwright...");
+      try {
+        const { chromium } = await import("playwright");
+        browser = await chromium.launch({
+          headless: true,
+          args: ["--disable-dev-shm-usage", "--disable-blink-features=AutomationControlled"],
+        });
+        console.log("Browser launched with playwright fallback");
+      } catch (playwrightError) {
+        console.error("Both cloakbrowser and playwright failed!");
+        throw playwrightError;
+      }
     }
-
-    // cloakbrowser exports a launch function directly
-    browser = await cloakbrowserModule.launch({
-      headless: true,
-      args: ["--disable-dev-shm-usage"],
-    });
-    console.log("Browser launched successfully with cloakbrowser");
   }
   return browser!;
 }
