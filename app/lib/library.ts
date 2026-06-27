@@ -1,4 +1,6 @@
-import { chromium, type Browser } from "playwright";
+'use server';
+
+import type { Browser } from "playwright";
 
 const LIBRARY_BASE_URL = "https://catalog.chappaqualibrary.org";
 const LOGIN_URL = `${LIBRARY_BASE_URL}/MyAccount/Login`;
@@ -17,36 +19,43 @@ let browser: Browser | null = null;
 
 async function getBrowser(): Promise<Browser> {
   if (!browser) {
-    console.log("Launching Chromium browser...");
-    browser = await chromium.launch({
+    console.log("Launching Chromium browser with cloakbrowser (stealth mode)...");
+    // Dynamically import cloakbrowser to avoid bundling server-only dependencies
+    let cloakbrowserModule: any;
+    try {
+      cloakbrowserModule = await import("cloakbrowser");
+    } catch (e) {
+      // Fallback to regular playwright if cloakbrowser fails
+      console.log("Cloakbrowser import failed, falling back to playwright");
+      const { chromium } = await import("playwright");
+      browser = await chromium.launch({
+        headless: true,
+        args: ["--disable-dev-shm-usage", "--disable-blink-features=AutomationControlled"],
+      });
+      console.log("Browser launched successfully (playwright fallback)");
+      return browser!;
+    }
+
+    // cloakbrowser exports a launch function directly
+    browser = await cloakbrowserModule.launch({
       headless: true,
-      args: [
-        "--disable-blink-features=AutomationControlled",
-        "--disable-dev-shm-usage",
-      ],
+      args: ["--disable-dev-shm-usage"],
     });
     console.log("Browser launched successfully");
   }
-  return browser;
+  return browser!;
 }
 
 async function fetchCheckedOutBooks(
   username: string,
   password: string
 ): Promise<CheckedOutBook[]> {
-  const browserInstance = await getBrowser();
+  const browserInstance = await getBrowser() as any;
 
   // Create a new page for this request
   const page = await browserInstance.newPage({
     userAgent:
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  });
-
-  // Spoof navigator properties to hide automation
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, "webdriver", {
-      get: () => false,
-    });
   });
 
   try {
@@ -167,6 +176,8 @@ function parseCheckoutPage(html: string): CheckedOutBook[] {
 
     // Extract text from first cell (title)
     const titleHtml = cells[0];
+    if (!titleHtml) return;
+
     const titleText = titleHtml
       .replace(/<[^>]*>/g, "")
       .replace(/&nbsp;/g, " ")

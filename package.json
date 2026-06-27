@@ -14,7 +14,8 @@
     "next": "^14.0.0",
     "next-auth": "^4.24.0",
     "axios": "^1.7.0",
-    "playwright": "^1.40.0"
+    "playwright": "^1.40.0",
+    "cloakbrowser": "^0.4.3"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

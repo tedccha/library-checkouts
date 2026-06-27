@@ -1,5 +1,5 @@
 import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/route";
+import { authOptions } from "@/app/lib/auth-options";
 import { fetchCheckedOutBooks } from "@/app/lib/library";
 
 export async function GET(request: Request) {
