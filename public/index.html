@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Library Checkouts</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .header {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      margin-bottom: 30px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      color: #333;
+    }
+
+    .header-right {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+
+    .user-info {
+      text-align: right;
+    }
+
+    .user-info p {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 5px;
+    }
+
+    .user-email {
+      font-weight: 600;
+      color: #333;
+    }
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .btn-sign-in {
+      background: #667eea;
+      color: white;
+      padding: 12px 24px;
+      font-size: 16px;
+    }
+
+    .btn-sign-in:hover {
+      background: #5568d3;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-refresh {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn-refresh:hover {
+      background: #5568d3;
+    }
+
+    .btn-logout {
+      background: #f0f0f0;
+      color: #333;
+    }
+
+    .btn-logout:hover {
+      background: #e0e0e0;
+    }
+
+    .login-page {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .login-card {
+      background: white;
+      padding: 50px;
+      border-radius: 12px;
+      text-align: center;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      max-width: 400px;
+    }
+
+    .login-card h2 {
+      font-size: 32px;
+      color: #333;
+      margin-bottom: 20px;
+    }
+
+    .login-card p {
+      color: #666;
+      margin-bottom: 30px;
+      line-height: 1.6;
+    }
+
+    .books-container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+    }
+
+    .books-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .books-table thead {
+      background: #f8f9fa;
+      border-bottom: 2px solid #e9ecef;
+    }
+
+    .books-table th {
+      padding: 15px;
+      text-align: left;
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .books-table td {
+      padding: 15px;
+      border-bottom: 1px solid #e9ecef;
+      color: #333;
+    }
+
+    .books-table tbody tr:hover {
+      background: #f8f9fa;
+    }
+
+    .title-cell {
+      font-weight: 500;
+      color: #667eea;
+    }
+
+    .due-soon {
+      color: #ff6b6b;
+      font-weight: 600;
+    }
+
+    .due-upcoming {
+      color: #ffa500;
+    }
+
+    .renewals {
+      text-align: center;
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      display: inline-block;
+    }
+
+    .renewals-high {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .renewals-low {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .empty-state {
+      padding: 40px;
+      text-align: center;
+      color: #666;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #667eea;
+    }
+
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 15px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+
+    .stat-card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .stat-number {
+      font-size: 32px;
+      font-weight: 700;
+      color: #667eea;
+    }
+
+    .stat-label {
+      color: #666;
+      font-size: 14px;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Login Page -->
+    <div id="loginPage" class="login-page" style="display: none;">
+      <div class="login-card">
+        <h2>📚 Library Checkouts</h2>
+        <p>Sign in with your Google account to see your checked-out books, due dates, and renewal information.</p>
+        <button class="btn-sign-in" onclick="signIn()">Sign In with Google</button>
+      </div>
+    </div>
+
+    <!-- Books Page -->
+    <div id="booksPage" style="display: none;">
+      <div class="header">
+        <div>
+          <h1>📚 My Library Books</h1>
+        </div>
+        <div class="header-right">
+          <div class="user-info" id="userInfo"></div>
+          <button class="btn-refresh" onclick="refreshBooks()">↻ Refresh</button>
+          <button class="btn-logout" onclick="signOut()">Sign Out</button>
+        </div>
+      </div>
+
+      <div class="stats" id="stats"></div>
+
+      <div id="error" class="error" style="display: none;"></div>
+
+      <div id="loading" class="loading" style="display: none;">
+        <div class="spinner"></div>
+        Loading your books...
+      </div>
+
+      <div id="booksContainer" class="books-container" style="display: none;">
+        <table class="books-table">
+          <thead>
+            <tr>
+              <th style="width: 50%;">Title</th>
+              <th style="width: 25%;">Due Date</th>
+              <th style="width: 25%;">Renewals</th>
+            </tr>
+          </thead>
+          <tbody id="booksList"></tbody>
+        </table>
+      </div>
+
+      <div id="emptyState" class="empty-state" style="display: none;">
+        No books checked out
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function checkAuth() {
+      try {
+        const response = await fetch('/');
+        const data = await response.json();
+
+        if (data.user) {
+          showBooksPage(data.user);
+          await refreshBooks();
+        } else {
+          showLoginPage();
+        }
+      } catch (error) {
+        showLoginPage();
+      }
+    }
+
+    function signIn() {
+      window.location.href = '/auth/google';
+    }
+
+    async function signOut() {
+      await fetch('/logout');
+      showLoginPage();
+    }
+
+    function showLoginPage() {
+      document.getElementById('loginPage').style.display = 'flex';
+      document.getElementById('booksPage').style.display = 'none';
+    }
+
+    function showBooksPage(userEmail) {
+      document.getElementById('loginPage').style.display = 'none';
+      document.getElementById('booksPage').style.display = 'block';
+      document.getElementById('userInfo').innerHTML = `
+        <p>Signed in as</p>
+        <p class="user-email">${userEmail}</p>
+      `;
+    }
+
+    async function refreshBooks() {
+      const loading = document.getElementById('loading');
+      const container = document.getElementById('booksContainer');
+      const empty = document.getElementById('emptyState');
+      const error = document.getElementById('error');
+      const stats = document.getElementById('stats');
+
+      loading.style.display = 'block';
+      container.style.display = 'none';
+      empty.style.display = 'none';
+      error.style.display = 'none';
+
+      try {
+        const response = await fetch('/api/books');
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to fetch books');
+        }
+
+        const books = data.books || [];
+        loading.style.display = 'none';
+
+        if (books.length === 0) {
+          empty.style.display = 'block';
+          stats.innerHTML = '';
+        } else {
+          displayBooks(books);
+          container.style.display = 'block';
+          updateStats(books);
+        }
+      } catch (err) {
+        loading.style.display = 'none';
+        error.style.display = 'block';
+        error.textContent = err.message;
+      }
+    }
+
+    function displayBooks(books) {
+      const tbody = document.getElementById('booksList');
+      tbody.innerHTML = books.map(book => {
+        const dueDate = new Date(book.dueDate);
+        const today = new Date();
+        const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+
+        let dueDateClass = '';
+        if (daysUntilDue <= 2) {
+          dueDateClass = 'due-soon';
+        } else if (daysUntilDue <= 7) {
+          dueDateClass = 'due-upcoming';
+        }
+
+        const renewalsClass = book.renewalsRemaining > 0 ? 'renewals-high' : 'renewals-low';
+
+        return `
+          <tr>
+            <td class="title-cell">${escapeHtml(book.title)}</td>
+            <td class="${dueDateClass}">${book.dueDate}</td>
+            <td><span class="renewals ${renewalsClass}">${book.renewalsRemaining}</span></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function updateStats(books) {
+      const today = new Date();
+      const dueSoon = books.filter(b => {
+        const dueDate = new Date(b.dueDate);
+        const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+        return daysUntilDue <= 7 && daysUntilDue > 0;
+      }).length;
+
+      const overdue = books.filter(b => {
+        const dueDate = new Date(b.dueDate);
+        return dueDate < today;
+      }).length;
+
+      document.getElementById('stats').innerHTML = `
+        <div class="stat-card">
+          <div class="stat-number">${books.length}</div>
+          <div class="stat-label">Books Checked Out</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">${dueSoon}</div>
+          <div class="stat-label">Due Within 7 Days</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">${overdue}</div>
+          <div class="stat-label">Overdue</div>
+        </div>
+      `;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Check auth on load
+    checkAuth();
+  </script>
+</body>
+</html>

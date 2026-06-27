@@ -13,6 +13,9 @@ dotenv.config({ path: path.join(__dirname, '.env.local') });
 const app = express();
 const PORT = 3000;
 
+// Serve static files
+app.use(express.static('public'));
+
 // Session setup
 app.use(session({
   secret: process.env.SESSION_SECRET || 'dev-secret-key',
