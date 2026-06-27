@@ -24,9 +24,11 @@ async function getBrowser(): Promise<Browser> {
     let cloakbrowserModule: any;
     try {
       cloakbrowserModule = await import("cloakbrowser");
+      console.log("Cloakbrowser imported successfully, launch function:", typeof cloakbrowserModule.launch);
     } catch (e) {
       // Fallback to regular playwright if cloakbrowser fails
-      console.log("Cloakbrowser import failed, falling back to playwright");
+      console.log("Cloakbrowser import failed:", e instanceof Error ? e.message : String(e));
+      console.log("Falling back to playwright");
       const { chromium } = await import("playwright");
       browser = await chromium.launch({
         headless: true,
@@ -41,7 +43,7 @@ async function getBrowser(): Promise<Browser> {
       headless: true,
       args: ["--disable-dev-shm-usage"],
     });
-    console.log("Browser launched successfully");
+    console.log("Browser launched successfully with cloakbrowser");
   }
   return browser!;
 }
