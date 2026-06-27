@@ -56,16 +56,12 @@ function requireAuth(req, res, next) {
   next();
 }
 
-// Routes
-app.get('/', (req, res) => {
+// Routes (API endpoints)
+app.get('/api/user', (req, res) => {
   if (req.user) {
-    res.json({
-      message: 'Welcome!',
-      user: req.user.emails[0].value,
-      booksUrl: '/api/books'
-    });
+    res.json({ user: req.user.emails[0].value });
   } else {
-    res.json({ message: 'Not authenticated. Visit /auth/google to sign in' });
+    res.json({ user: null });
   }
 });
 

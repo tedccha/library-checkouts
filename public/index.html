@@ -317,7 +317,7 @@
   <script>
     async function checkAuth() {
       try {
-        const response = await fetch('/');
+        const response = await fetch('/api/user');
         const data = await response.json();
 
         if (data.user) {
