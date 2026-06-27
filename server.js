@@ -3,7 +3,7 @@ import session from 'express-session';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import dotenv from 'dotenv';
-import { fetchCheckedOutBooks } from './lib/library.js';
+import { fetchCheckedOutBooks, fetchHolds } from './lib/library.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -85,6 +85,20 @@ app.get('/api/books', requireAuth, async (req, res) => {
       process.env.LIBRARY_PASSWORD
     );
     res.json({ books });
+  } catch (error) {
+    console.error('Error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/holds', requireAuth, async (req, res) => {
+  try {
+    console.log(`Fetching holds for ${req.user.emails[0].value}...`);
+    const holds = await fetchHolds(
+      process.env.LIBRARY_USERNAME,
+      process.env.LIBRARY_PASSWORD
+    );
+    res.json({ holds });
   } catch (error) {
     console.error('Error:', error.message);
     res.status(500).json({ error: error.message });
