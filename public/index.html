@@ -295,17 +295,55 @@
         Loading your books...
       </div>
 
-      <div id="booksContainer" class="books-container" style="display: none;">
-        <table class="books-table">
-          <thead>
-            <tr>
-              <th style="width: 50%;">Title</th>
-              <th style="width: 25%;">Due Date</th>
-              <th style="width: 25%;">Renewals</th>
-            </tr>
-          </thead>
-          <tbody id="booksList"></tbody>
-        </table>
+      <!-- Overdue Section -->
+      <div id="overdueSection" style="display: none; margin-bottom: 30px;">
+        <h2 style="color: #ff6b6b; margin-bottom: 15px;">⚠️ Overdue Books</h2>
+        <div class="books-container">
+          <table class="books-table">
+            <thead>
+              <tr>
+                <th style="width: 50%;">Title</th>
+                <th style="width: 25%;">Due Date</th>
+                <th style="width: 25%;">Renewals</th>
+              </tr>
+            </thead>
+            <tbody id="overdueList"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Current Books Section -->
+      <div id="booksSection" style="display: none;">
+        <h2 style="margin-bottom: 15px;">📚 Checked Out</h2>
+        <div class="books-container">
+          <table class="books-table">
+            <thead>
+              <tr>
+                <th style="width: 50%;">Title</th>
+                <th style="width: 25%;">Due Date</th>
+                <th style="width: 25%;">Renewals</th>
+              </tr>
+            </thead>
+            <tbody id="booksList"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Holds Section -->
+      <div id="holdsSection" style="display: none; margin-top: 30px;">
+        <h2 style="margin-bottom: 15px;">🔖 On Hold</h2>
+        <div class="books-container">
+          <table class="books-table">
+            <thead>
+              <tr>
+                <th style="width: 60%;">Title</th>
+                <th style="width: 20%;">Status</th>
+                <th style="width: 20%;">Pickup By</th>
+              </tr>
+            </thead>
+            <tbody id="holdsList"></tbody>
+          </table>
+        </div>
       </div>
 
       <div id="emptyState" class="empty-state" style="display: none;">
@@ -356,34 +394,64 @@
 
     async function refreshBooks() {
       const loading = document.getElementById('loading');
-      const container = document.getElementById('booksContainer');
+      const booksSection = document.getElementById('booksSection');
+      const overdueSection = document.getElementById('overdueSection');
+      const holdsSection = document.getElementById('holdsSection');
       const empty = document.getElementById('emptyState');
       const error = document.getElementById('error');
       const stats = document.getElementById('stats');
 
       loading.style.display = 'block';
-      container.style.display = 'none';
+      booksSection.style.display = 'none';
+      overdueSection.style.display = 'none';
+      holdsSection.style.display = 'none';
       empty.style.display = 'none';
       error.style.display = 'none';
 
       try {
-        const response = await fetch('/api/books');
-        const data = await response.json();
+        // Fetch books
+        const booksResponse = await fetch('/api/books');
+        const booksData = await booksResponse.json();
 
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to fetch books');
+        if (!booksResponse.ok) {
+          throw new Error(booksData.error || 'Failed to fetch books');
         }
 
-        const books = data.books || [];
+        const books = booksData.books || [];
+        const overdue = booksData.overdue || [];
+        const total = booksData.total || 0;
+
+        // Fetch holds
+        let holds = [];
+        try {
+          const holdsResponse = await fetch('/api/holds');
+          const holdsData = await holdsResponse.json();
+          if (holdsResponse.ok) {
+            holds = holdsData.holds || [];
+          }
+        } catch (e) {
+          console.log('Holds not available');
+        }
+
         loading.style.display = 'none';
 
-        if (books.length === 0) {
+        if (total === 0 && holds.length === 0) {
           empty.style.display = 'block';
           stats.innerHTML = '';
         } else {
-          displayBooks(books);
-          container.style.display = 'block';
-          updateStats(books);
+          if (overdue.length > 0) {
+            displayOverdue(overdue);
+            overdueSection.style.display = 'block';
+          }
+          if (books.length > 0) {
+            displayBooks(books);
+            booksSection.style.display = 'block';
+          }
+          if (holds.length > 0) {
+            displayHolds(holds);
+            holdsSection.style.display = 'block';
+          }
+          updateStats(books, overdue, holds);
         }
       } catch (err) {
         loading.style.display = 'none';
@@ -418,7 +486,36 @@
       }).join('');
     }
 
-    function updateStats(books) {
+    function displayOverdue(books) {
+      const tbody = document.getElementById('overdueList');
+      tbody.innerHTML = books.map(book => {
+        const renewalsClass = book.renewalsRemaining > 0 ? 'renewals-high' : 'renewals-low';
+        return `
+          <tr>
+            <td class="title-cell">${escapeHtml(book.title)}</td>
+            <td class="due-soon">${book.dueDate}</td>
+            <td><span class="renewals ${renewalsClass}">${book.renewalsRemaining}</span></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function displayHolds(holds) {
+      const tbody = document.getElementById('holdsList');
+      tbody.innerHTML = holds.map(hold => {
+        const statusClass = hold.status === 'Ready for Pickup' ? 'due-soon' : '';
+        const statusBadge = hold.status === 'Ready for Pickup' ? '🟢' : '🟡';
+        return `
+          <tr>
+            <td class="title-cell">${escapeHtml(hold.title)}</td>
+            <td><span class="renewals ${statusClass}">${statusBadge} ${hold.status}</span></td>
+            <td>${hold.pickupBy}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function updateStats(books, overdue, holds) {
       const today = new Date();
       const dueSoon = books.filter(b => {
         const dueDate = new Date(b.dueDate);
@@ -426,14 +523,9 @@
         return daysUntilDue <= 7 && daysUntilDue > 0;
       }).length;
 
-      const overdue = books.filter(b => {
-        const dueDate = new Date(b.dueDate);
-        return dueDate < today;
-      }).length;
-
       document.getElementById('stats').innerHTML = `
         <div class="stat-card">
-          <div class="stat-number">${books.length}</div>
+          <div class="stat-number">${books.length + overdue.length}</div>
           <div class="stat-label">Books Checked Out</div>
         </div>
         <div class="stat-card">
@@ -441,9 +533,15 @@
           <div class="stat-label">Due Within 7 Days</div>
         </div>
         <div class="stat-card">
-          <div class="stat-number">${overdue}</div>
+          <div class="stat-number">${overdue.length}</div>
           <div class="stat-label">Overdue</div>
         </div>
+        ${holds.length > 0 ? `
+        <div class="stat-card">
+          <div class="stat-number">${holds.length}</div>
+          <div class="stat-label">On Hold</div>
+        </div>
+        ` : ''}
       `;
     }
 

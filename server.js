@@ -83,7 +83,30 @@ app.get('/api/books', requireAuth, async (req, res) => {
       process.env.LIBRARY_USERNAME,
       process.env.LIBRARY_PASSWORD
     );
-    res.json({ books });
+
+    // Separate overdue and current books
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const overdue = [];
+    const current = [];
+
+    books.forEach(book => {
+      const dueDate = new Date(book.dueDate);
+      dueDate.setHours(0, 0, 0, 0);
+
+      if (dueDate < today) {
+        overdue.push(book);
+      } else {
+        current.push(book);
+      }
+    });
+
+    res.json({
+      books: current,
+      overdue: overdue,
+      total: books.length
+    });
   } catch (error) {
     console.error('Error:', error.message);
     res.status(500).json({ error: error.message });
