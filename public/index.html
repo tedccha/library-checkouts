@@ -331,7 +331,7 @@
         </div>
       </div>
 
-      <!-- Holds Section -->
+      <!-- Holds Section (TODO: fix browser session reuse)
       <div id="holdsSection" style="display: none; margin-top: 30px;">
         <h2 style="margin-bottom: 15px;">🔖 On Hold</h2>
         <div class="books-container">
@@ -347,6 +347,7 @@
           </table>
         </div>
       </div>
+      -->
 
       <div id="emptyState" class="empty-state" style="display: none;">
         No books checked out
@@ -423,22 +424,9 @@
         const overdue = booksData.overdue || [];
         const total = booksData.total || 0;
 
-        // Fetch holds (with timeout)
+        // TODO: Holds fetching disabled - needs browser session reuse fix
+        // For now, set holds to empty
         let holds = [];
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-
-          const holdsResponse = await fetch('/api/holds', { signal: controller.signal });
-          clearTimeout(timeoutId);
-
-          const holdsData = await holdsResponse.json();
-          if (holdsResponse.ok) {
-            holds = holdsData.holds || [];
-          }
-        } catch (e) {
-          console.log('Holds not available:', e.message);
-        }
 
         loading.style.display = 'none';
 
