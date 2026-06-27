@@ -4,9 +4,9 @@ A personal web app showing library books you have checked out, with due dates an
 
 ## Architecture
 
-- **Next.js 15** with TypeScript
-- **NextAuth.js v5** for Google OAuth + email whitelist
-- **Aspen Discovery API** for library data (fallback: HTTP cookies if API unavailable)
+- **Next.js 14** with TypeScript
+- **NextAuth.js v4** for Google OAuth + email whitelist
+- **Playwright + Stealth Plugin** for headless browser automation (bypasses Cloudflare bot detection)
 - **Railway** hosting (persistent server, no serverless limitations)
 
 ## Setup
@@ -42,27 +42,28 @@ Visit `http://localhost:3000` and sign in with Google.
 
 ## Library Integration
 
-The catalog runs behind Cloudflare bot protection, which blocks headless browser requests. Instead, we use authenticated session cookies:
-
-### Getting cookies:
-1. Open https://catalog.chappaqualibrary.org in your browser and sign in
-2. Open DevTools → Application tab → Cookies
-3. Find cookies for `catalog.chappaqualibrary.org` (especially `PHPSESSID`, `aspendiscovery`)
-4. Copy all cookie values and paste into `LIBRARY_COOKIES` env var as a semicolon-separated string:
-   ```
-   LIBRARY_COOKIES=PHPSESSID=abc123; aspendiscovery=xyz789; other_cookie=value
-   ```
-5. Restart the app
+The Chappaqua Library catalog runs behind Cloudflare bot protection. We use **Playwright with a stealth plugin** to:
+- Mimic a real browser (defeats Cloudflare detection)
+- Automatically handle login
+- Extract book data from the checkout page
 
 ### How it works:
-- `app/lib/library.ts` — fetches the checkout page using stored session cookies
-- Parses HTML to extract book titles, due dates, renewal counts
-- HTML parsing is basic — will refine once we see the actual page structure
+1. Playwright launches a headless Chromium browser
+2. Stealth plugin patches the browser fingerprint to avoid Cloudflare bot detection
+3. Logs into the library with your credentials
+4. Navigates to the checkouts page
+5. Parses HTML to extract: title, due date, renewal count
+6. Returns data to the API
 
-### Cookies expire:
-- Library session cookies typically last 30 days
-- When they expire, the app will return a "cookies may be expired" error
-- Re-export fresh cookies from your browser and update `LIBRARY_COOKIES`
+### Setup:
+- Add `LIBRARY_USERNAME` and `LIBRARY_PASSWORD` to `.env.local`
+- The app stores nothing — credentials are used only for each request
+- No sessions, no cookie expiration to worry about
+
+### Performance:
+- First fetch takes ~10-15s (browser startup)
+- Subsequent fetches reuse the same browser context (~3-5s)
+- Browser instance is kept alive for fast subsequent calls
 
 ## Deployment (Railway)
 

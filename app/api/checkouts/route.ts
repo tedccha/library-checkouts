@@ -9,20 +9,24 @@ export async function GET(request: Request) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const libraryCookies = process.env.LIBRARY_COOKIES;
+  const libraryUsername = process.env.LIBRARY_USERNAME;
+  const libraryPassword = process.env.LIBRARY_PASSWORD;
 
-  if (!libraryCookies) {
+  if (!libraryUsername || !libraryPassword) {
     return Response.json(
       {
         error:
-          "Library cookies not configured. Sign in to catalog.chappaqualibrary.org and export session cookies to LIBRARY_COOKIES env var. See CLAUDE.md for instructions.",
+          "Library credentials not configured. Add LIBRARY_USERNAME and LIBRARY_PASSWORD to env vars.",
       },
       { status: 500 }
     );
   }
 
   try {
-    const checkouts = await fetchCheckedOutBooks(libraryCookies);
+    const checkouts = await fetchCheckedOutBooks(
+      libraryUsername,
+      libraryPassword
+    );
     return Response.json({ checkouts });
   } catch (error) {
     console.error("Error fetching checkouts:", error);

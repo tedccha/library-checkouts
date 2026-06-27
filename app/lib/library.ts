@@ -1,6 +1,8 @@
-import axios from "axios";
+import chromium from "@playwright/browser-chromium";
+import StealthPlugin from "playwright-extra-plugin-stealth";
 
 const LIBRARY_BASE_URL = "https://catalog.chappaqualibrary.org";
+const LOGIN_URL = `${LIBRARY_BASE_URL}/MyAccount/Login`;
 const CHECKOUT_PAGE_URL = `${LIBRARY_BASE_URL}/MyAccount/CheckedOut?source=all`;
 
 export interface CheckedOutBook {
@@ -12,103 +14,137 @@ export interface CheckedOutBook {
   barcode?: string;
 }
 
-/**
- * Fetch checkouts using stored session cookies.
- *
- * To get cookies:
- * 1. Sign in at https://catalog.chappaqualibrary.org
- * 2. Open DevTools → Application → Cookies
- * 3. Export or copy cookie values (especially PHPSESSID, aspendiscovery)
- * 4. Add to LIBRARY_COOKIES env var as semicolon-separated string
- */
-async function fetchCheckedOutBooks(sessionCookies: string): Promise<CheckedOutBook[]> {
-  if (!sessionCookies) {
-    throw new Error(
-      "No library session cookies. Sign in to catalog.chappaqualibrary.org and export cookies to LIBRARY_COOKIES env var"
-    );
-  }
+let browser: any = null;
 
-  try {
-    // Fetch the checkout page with session cookies
-    const response = await axios.get(CHECKOUT_PAGE_URL, {
-      headers: {
-        Cookie: sessionCookies,
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-      },
-      validateStatus: () => true,
-      timeout: 10000,
+async function getBrowser() {
+  if (!browser) {
+    const playwright = await import("playwright-extra");
+    const pextra = playwright.default;
+
+    // Add stealth plugin to avoid Cloudflare bot detection
+    pextra.addInitializer(() => {
+      pextra.addPlugin(StealthPlugin());
     });
 
-    console.log(`Checkout page status: ${response.status}`);
+    browser = await pextra.chromium.launch({
+      headless: true,
+      args: ["--disable-blink-features=AutomationControlled"],
+    });
+  }
+  return browser;
+}
 
-    if (response.status !== 200) {
-      throw new Error(
-        `Failed to fetch page: ${response.status}. Cookies may be expired.`
-      );
+async function fetchCheckedOutBooks(
+  username: string,
+  password: string
+): Promise<CheckedOutBook[]> {
+  const browser = await getBrowser();
+  const context = await browser.createBrowserContext();
+  const page = await context.newPage();
+
+  try {
+    // Navigate to login page
+    console.log("Navigating to library login...");
+    await page.goto(LOGIN_URL, { waitUntil: "networkidle" });
+
+    // Fill in credentials
+    console.log("Entering credentials...");
+    const usernameField = await page.$('input[name*="username"], input[name*="user"], input[type="text"]');
+    const passwordField = await page.$('input[name*="password"], input[type="password"]');
+
+    if (!usernameField || !passwordField) {
+      throw new Error("Could not find username or password fields on login page");
     }
 
-    // Parse HTML to extract checkout data
-    const books = parseCheckoutPage(response.data);
+    await usernameField.fill(username);
+    await passwordField.fill(password);
+
+    // Submit login
+    console.log("Submitting login...");
+    const submitButton = await page.$('button[type="submit"], input[type="submit"]');
+    if (submitButton) {
+      await submitButton.click();
+    } else {
+      await page.keyboard.press("Enter");
+    }
+
+    // Wait for navigation
+    await page.waitForNavigation({ waitUntil: "networkidle", timeout: 30000 });
+
+    // Navigate to checkouts page
+    console.log("Navigating to checkouts page...");
+    await page.goto(CHECKOUT_PAGE_URL, { waitUntil: "networkidle" });
+
+    // Extract books from page
+    const html = await page.content();
+    const books = parseCheckoutPage(html);
+
+    console.log(`Successfully fetched ${books.length} checked-out books`);
     return books;
   } catch (error) {
-    console.error("Failed to fetch checkouts:", error);
+    console.error("Error fetching checkouts:", error);
     throw error;
+  } finally {
+    await context.close();
   }
 }
 
-/**
- * Parse the checkout page HTML to extract book data.
- * This is a basic implementation — will be refined based on actual page structure.
- */
 function parseCheckoutPage(html: string): CheckedOutBook[] {
-  // Extract book rows from the checkout table
-  // Pattern: look for table rows with book information
-
   const books: CheckedOutBook[] = [];
 
-  // Regex patterns to find checkout rows (will be refined after inspecting actual HTML)
+  // Look for table rows in the checkout table
   const rowPattern = /<tr[^>]*>[\s\S]*?<\/tr>/g;
   const rows = html.match(rowPattern) || [];
 
   rows.forEach((row, index) => {
-    // Skip header row
-    if (row.includes("thead") || row.includes("Title")) return;
+    // Skip header rows
+    if (
+      row.includes("thead") ||
+      row.includes("Title") ||
+      row.includes("Due Date")
+    )
+      return;
 
-    // Extract fields from cells
-    const titleMatch = row.match(/<td[^>]*>(.*?)<\/td>/);
-    const dueDateMatch = row.match(
-      /Due Date[:\s]*([^<]*)|<td[^>]*>\s*(\d+\/\d+\/\d+)/i
-    );
-    const renewalsMatch = row.match(
-      /Renewals[:\s]*(\d+)|<td[^>]*>\s*(\d+)\s*<\/td>/i
-    );
+    // Extract all cells
+    const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/g) || [];
 
-    if (titleMatch) {
-      const title = titleMatch[1]
-        .replace(/<[^>]*>/g, "")
-        .trim();
-      const dueDate = dueDateMatch
-        ? (dueDateMatch[1] || dueDateMatch[2] || "").trim()
-        : "N/A";
-      const renewals = renewalsMatch
-        ? parseInt(renewalsMatch[1] || renewalsMatch[2] || "0")
-        : 0;
+    if (cells.length < 2) return;
 
-      if (title) {
-        books.push({
-          id: `book-${index}`,
-          title,
-          author: "",
-          dueDate,
-          renewalsRemaining: renewals,
-          barcode: "",
-        });
+    // Extract text from first cell (title)
+    const titleHtml = cells[0];
+    const titleText = titleHtml
+      .replace(/<[^>]*>/g, "")
+      .trim();
+
+    if (titleText) {
+      // Look for due date and renewal count in remaining cells
+      let dueDate = "N/A";
+      let renewals = 0;
+
+      for (let i = 1; i < cells.length; i++) {
+        const cellText = cells[i].replace(/<[^>]*>/g, "").trim();
+
+        // Check if looks like a date (MM/DD/YYYY or similar)
+        if (/\d+\/\d+\/\d+/.test(cellText)) {
+          dueDate = cellText;
+        }
+        // Check if looks like a number
+        else if (/^\d+$/.test(cellText)) {
+          renewals = parseInt(cellText);
+        }
       }
+
+      books.push({
+        id: `book-${index}`,
+        title: titleText,
+        author: "",
+        dueDate,
+        renewalsRemaining: renewals,
+        barcode: "",
+      });
     }
   });
 
-  console.log(`Parsed ${books.length} checked-out books`);
   return books;
 }
 
