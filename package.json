@@ -14,9 +14,7 @@
     "next": "^14.0.0",
     "next-auth": "^4.24.0",
     "axios": "^1.7.0",
-    "@playwright/browser-chromium": "^1.40.0",
-    "playwright-extra": "^3.3.6",
-    "playwright-extra-plugin-stealth": "^2.11.2"
+    "playwright": "^1.40.0"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

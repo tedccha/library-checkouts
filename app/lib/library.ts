@@ -1,5 +1,4 @@
-import chromium from "@playwright/browser-chromium";
-import StealthPlugin from "playwright-extra-plugin-stealth";
+import { chromium } from "playwright";
 
 const LIBRARY_BASE_URL = "https://catalog.chappaqualibrary.org";
 const LOGIN_URL = `${LIBRARY_BASE_URL}/MyAccount/Login`;
@@ -18,17 +17,12 @@ let browser: any = null;
 
 async function getBrowser() {
   if (!browser) {
-    const playwright = await import("playwright-extra");
-    const pextra = playwright.default;
-
-    // Add stealth plugin to avoid Cloudflare bot detection
-    pextra.addInitializer(() => {
-      pextra.addPlugin(StealthPlugin());
-    });
-
-    browser = await pextra.chromium.launch({
+    browser = await chromium.launch({
       headless: true,
-      args: ["--disable-blink-features=AutomationControlled"],
+      args: [
+        "--disable-blink-features=AutomationControlled",
+        "--disable-dev-shm-usage",
+      ],
     });
   }
   return browser;
@@ -39,13 +33,26 @@ async function fetchCheckedOutBooks(
   password: string
 ): Promise<CheckedOutBook[]> {
   const browser = await getBrowser();
-  const context = await browser.createBrowserContext();
+
+  // Create context with stealth headers
+  const context = await browser.createBrowserContext({
+    userAgent:
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  });
+
   const page = await context.newPage();
+
+  // Spoof navigator properties
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "webdriver", {
+      get: () => false,
+    });
+  });
 
   try {
     // Navigate to login page
     console.log("Navigating to library login...");
-    await page.goto(LOGIN_URL, { waitUntil: "networkidle" });
+    await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 30000 });
 
     // Fill in credentials
     console.log("Entering credentials...");
@@ -68,12 +75,20 @@ async function fetchCheckedOutBooks(
       await page.keyboard.press("Enter");
     }
 
-    // Wait for navigation
-    await page.waitForNavigation({ waitUntil: "networkidle", timeout: 30000 });
+    // Wait for navigation to complete
+    console.log("Waiting for login to complete...");
+    try {
+      await page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 30000 });
+    } catch {
+      // Navigation might not trigger in all cases
+    }
+
+    // Give it a moment to load
+    await page.waitForTimeout(2000);
 
     // Navigate to checkouts page
     console.log("Navigating to checkouts page...");
-    await page.goto(CHECKOUT_PAGE_URL, { waitUntil: "networkidle" });
+    await page.goto(CHECKOUT_PAGE_URL, { waitUntil: "domcontentloaded", timeout: 30000 });
 
     // Extract books from page
     const html = await page.content();
