@@ -461,8 +461,16 @@
     }
 
     function displayBooks(books) {
+      // Sort by renewals (0 first), then by due date (ascending)
+      const sorted = [...books].sort((a, b) => {
+        if (a.renewalsRemaining !== b.renewalsRemaining) {
+          return a.renewalsRemaining - b.renewalsRemaining;
+        }
+        return new Date(a.dueDate) - new Date(b.dueDate);
+      });
+
       const tbody = document.getElementById('booksList');
-      tbody.innerHTML = books.map(book => {
+      tbody.innerHTML = sorted.map(book => {
         const dueDate = new Date(book.dueDate);
         const today = new Date();
         const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
@@ -487,8 +495,16 @@
     }
 
     function displayOverdue(books) {
+      // Sort by renewals (0 first), then by due date (ascending - oldest first)
+      const sorted = [...books].sort((a, b) => {
+        if (a.renewalsRemaining !== b.renewalsRemaining) {
+          return a.renewalsRemaining - b.renewalsRemaining;
+        }
+        return new Date(a.dueDate) - new Date(b.dueDate);
+      });
+
       const tbody = document.getElementById('overdueList');
-      tbody.innerHTML = books.map(book => {
+      tbody.innerHTML = sorted.map(book => {
         const renewalsClass = book.renewalsRemaining > 0 ? 'renewals-high' : 'renewals-low';
         return `
           <tr>
