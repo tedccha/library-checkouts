@@ -1,4 +1,4 @@
-import { chromium } from "playwright";
+import { chromium, type Browser } from "playwright";
 
 const LIBRARY_BASE_URL = "https://catalog.chappaqualibrary.org";
 const LOGIN_URL = `${LIBRARY_BASE_URL}/MyAccount/Login`;
@@ -13,10 +13,11 @@ export interface CheckedOutBook {
   barcode?: string;
 }
 
-let browser: any = null;
+let browser: Browser | null = null;
 
-async function getBrowser() {
+async function getBrowser(): Promise<Browser> {
   if (!browser) {
+    console.log("Launching Chromium browser...");
     browser = await chromium.launch({
       headless: true,
       args: [
@@ -24,6 +25,7 @@ async function getBrowser() {
         "--disable-dev-shm-usage",
       ],
     });
+    console.log("Browser launched successfully");
   }
   return browser;
 }
@@ -32,17 +34,15 @@ async function fetchCheckedOutBooks(
   username: string,
   password: string
 ): Promise<CheckedOutBook[]> {
-  const browser = await getBrowser();
+  const browserInstance = await getBrowser();
 
-  // Create context with stealth headers
-  const context = await browser.createBrowserContext({
+  // Create a new page for this request
+  const page = await browserInstance.newPage({
     userAgent:
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
   });
 
-  const page = await context.newPage();
-
-  // Spoof navigator properties
+  // Spoof navigator properties to hide automation
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "webdriver", {
       get: () => false,
@@ -52,11 +52,16 @@ async function fetchCheckedOutBooks(
   try {
     // Navigate to login page
     console.log("Navigating to library login...");
-    await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 30000 });
+    await page.goto(LOGIN_URL, {
+      waitUntil: "domcontentloaded",
+      timeout: 30000,
+    });
 
     // Fill in credentials
     console.log("Entering credentials...");
-    const usernameField = await page.$('input[name*="username"], input[name*="user"], input[type="text"]');
+    const usernameField = await page.$(
+      'input[name*="username"], input[name*="user"], input[type="text"]'
+    );
     const passwordField = await page.$('input[name*="password"], input[type="password"]');
 
     if (!usernameField || !passwordField) {
@@ -68,7 +73,9 @@ async function fetchCheckedOutBooks(
 
     // Submit login
     console.log("Submitting login...");
-    const submitButton = await page.$('button[type="submit"], input[type="submit"]');
+    const submitButton = await page.$(
+      'button[type="submit"], input[type="submit"]'
+    );
     if (submitButton) {
       await submitButton.click();
     } else {
@@ -78,9 +85,12 @@ async function fetchCheckedOutBooks(
     // Wait for navigation to complete
     console.log("Waiting for login to complete...");
     try {
-      await page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 30000 });
+      await page.waitForNavigation({
+        waitUntil: "domcontentloaded",
+        timeout: 30000,
+      });
     } catch {
-      // Navigation might not trigger in all cases
+      // Navigation might not trigger in all cases, that's ok
     }
 
     // Give it a moment to load
@@ -88,60 +98,95 @@ async function fetchCheckedOutBooks(
 
     // Navigate to checkouts page
     console.log("Navigating to checkouts page...");
-    await page.goto(CHECKOUT_PAGE_URL, { waitUntil: "domcontentloaded", timeout: 30000 });
+    await page.goto(CHECKOUT_PAGE_URL, {
+      waitUntil: "domcontentloaded",
+      timeout: 30000,
+    });
 
     // Extract books from page
     const html = await page.content();
+
+    // Save HTML for debugging
+    const fs = await import("fs/promises");
+    try {
+      await fs.writeFile("/tmp/library-checkout.html", html);
+      console.log("HTML saved to /tmp/library-checkout.html for inspection");
+    } catch (e) {
+      console.log("Could not save HTML file");
+    }
+
     const books = parseCheckoutPage(html);
 
     console.log(`Successfully fetched ${books.length} checked-out books`);
     return books;
   } catch (error) {
-    console.error("Error fetching checkouts:", error);
+    console.error("Error during checkout fetch:", error);
     throw error;
   } finally {
-    await context.close();
+    await page.close();
   }
 }
 
 function parseCheckoutPage(html: string): CheckedOutBook[] {
   const books: CheckedOutBook[] = [];
 
-  // Look for table rows in the checkout table
+  // Debug: log a snippet of the HTML to understand structure
+  const snippet = html.substring(0, 5000);
+  console.log("HTML snippet (first 5000 chars):", snippet.substring(0, 2000));
+
+  // Look for various table patterns
+  // Try to find rows with book data
   const rowPattern = /<tr[^>]*>[\s\S]*?<\/tr>/g;
   const rows = html.match(rowPattern) || [];
+
+  console.log(`Found ${rows.length} table rows`);
+
+  if (rows.length === 0) {
+    console.log("No table rows found, trying alternative patterns...");
+    // Try to find any divs or containers that might contain book info
+    const titlePattern = /title[^<]*(?:checked out|due)/gi;
+    if (html.match(titlePattern)) {
+      console.log("Found potential book entries with regex");
+    }
+  }
 
   rows.forEach((row, index) => {
     // Skip header rows
     if (
       row.includes("thead") ||
-      row.includes("Title") ||
-      row.includes("Due Date")
+      row.includes("thead") ||
+      row.toLowerCase().includes("title") ||
+      row.toLowerCase().includes("due date")
     )
       return;
 
     // Extract all cells
     const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/g) || [];
 
-    if (cells.length < 2) return;
+    if (cells.length < 1) return;
 
     // Extract text from first cell (title)
     const titleHtml = cells[0];
     const titleText = titleHtml
       .replace(/<[^>]*>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
       .trim();
 
-    if (titleText) {
+    if (titleText && titleText.length > 2) {
       // Look for due date and renewal count in remaining cells
       let dueDate = "N/A";
       let renewals = 0;
 
       for (let i = 1; i < cells.length; i++) {
-        const cellText = cells[i].replace(/<[^>]*>/g, "").trim();
+        const cellText = cells[i]
+          .replace(/<[^>]*>/g, "")
+          .replace(/&nbsp;/g, " ")
+          .trim();
 
         // Check if looks like a date (MM/DD/YYYY or similar)
         if (/\d+\/\d+\/\d+/.test(cellText)) {
-          dueDate = cellText;
+          dueDate = cellText.match(/\d+\/\d+\/\d+/)?.[0] || cellText;
         }
         // Check if looks like a number
         else if (/^\d+$/.test(cellText)) {
@@ -157,9 +202,12 @@ function parseCheckoutPage(html: string): CheckedOutBook[] {
         renewalsRemaining: renewals,
         barcode: "",
       });
+
+      console.log(`Parsed book: ${titleText} | Due: ${dueDate} | Renewals: ${renewals}`);
     }
   });
 
+  console.log(`Total books parsed: ${books.length}`);
   return books;
 }
 
