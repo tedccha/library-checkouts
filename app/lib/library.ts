@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const LIBRARY_BASE_URL = "https://catalog.chappaqualibrary.org";
-const API_ENDPOINT = `${LIBRARY_BASE_URL}/API`;
+const CHECKOUT_PAGE_URL = `${LIBRARY_BASE_URL}/MyAccount/CheckedOut?source=all`;
 
 export interface CheckedOutBook {
   id: string;
@@ -12,54 +12,44 @@ export interface CheckedOutBook {
   barcode?: string;
 }
 
-async function loginAndGetCookie(username: string, password: string) {
-  try {
-    const response = await axios.post(
-      `${API_ENDPOINT}/UserAPI?method=login`,
-      {
-        user_name: username,
-        password: password,
-      },
-      {
-        validateStatus: () => true,
-      }
+/**
+ * Fetch checkouts using stored session cookies.
+ *
+ * To get cookies:
+ * 1. Sign in at https://catalog.chappaqualibrary.org
+ * 2. Open DevTools → Application → Cookies
+ * 3. Export or copy cookie values (especially PHPSESSID, aspendiscovery)
+ * 4. Add to LIBRARY_COOKIES env var as semicolon-separated string
+ */
+async function fetchCheckedOutBooks(sessionCookies: string): Promise<CheckedOutBook[]> {
+  if (!sessionCookies) {
+    throw new Error(
+      "No library session cookies. Sign in to catalog.chappaqualibrary.org and export cookies to LIBRARY_COOKIES env var"
     );
-
-    const setCookie = response.headers["set-cookie"];
-    if (setCookie && Array.isArray(setCookie)) {
-      return setCookie.find((c) => c.includes("PHPSESSID"));
-    }
-    return null;
-  } catch (error) {
-    console.error("Login failed:", error);
-    return null;
   }
-}
 
-async function fetchCheckedOutBooks(
-  username: string,
-  password: string
-): Promise<CheckedOutBook[]> {
   try {
-    // Try Aspen API first
-    const loginCookie = await loginAndGetCookie(username, password);
+    // Fetch the checkout page with session cookies
+    const response = await axios.get(CHECKOUT_PAGE_URL, {
+      headers: {
+        Cookie: sessionCookies,
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+      },
+      validateStatus: () => true,
+      timeout: 10000,
+    });
 
-    if (!loginCookie) {
-      throw new Error("Failed to authenticate");
+    console.log(`Checkout page status: ${response.status}`);
+
+    if (response.status !== 200) {
+      throw new Error(
+        `Failed to fetch page: ${response.status}. Cookies may be expired.`
+      );
     }
 
-    const checkoutsResponse = await axios.get(
-      `${API_ENDPOINT}/UserAPI?method=getCheckedOutTitles&user_name=${username}`,
-      {
-        headers: {
-          Cookie: loginCookie,
-        },
-        validateStatus: () => true,
-      }
-    );
-
-    // Parse API response
-    const books = parseAspenResponse(checkoutsResponse.data);
+    // Parse HTML to extract checkout data
+    const books = parseCheckoutPage(response.data);
     return books;
   } catch (error) {
     console.error("Failed to fetch checkouts:", error);
@@ -67,23 +57,59 @@ async function fetchCheckedOutBooks(
   }
 }
 
-function parseAspenResponse(data: unknown): CheckedOutBook[] {
-  // Placeholder — will adapt based on actual API response format
-  if (typeof data !== "object" || !data) return [];
+/**
+ * Parse the checkout page HTML to extract book data.
+ * This is a basic implementation — will be refined based on actual page structure.
+ */
+function parseCheckoutPage(html: string): CheckedOutBook[] {
+  // Extract book rows from the checkout table
+  // Pattern: look for table rows with book information
 
-  const result = data as Record<string, unknown>;
-  const titles = result.titles as Record<string, unknown>[];
+  const books: CheckedOutBook[] = [];
 
-  if (!Array.isArray(titles)) return [];
+  // Regex patterns to find checkout rows (will be refined after inspecting actual HTML)
+  const rowPattern = /<tr[^>]*>[\s\S]*?<\/tr>/g;
+  const rows = html.match(rowPattern) || [];
 
-  return titles.map((title: Record<string, unknown>) => ({
-    id: String(title.id || ""),
-    title: String(title.title || "Unknown"),
-    author: String(title.author || ""),
-    dueDate: String(title.dueDate || ""),
-    renewalsRemaining: Number(title.renewalsRemaining || 0),
-    barcode: String(title.barcode || ""),
-  }));
+  rows.forEach((row, index) => {
+    // Skip header row
+    if (row.includes("thead") || row.includes("Title")) return;
+
+    // Extract fields from cells
+    const titleMatch = row.match(/<td[^>]*>(.*?)<\/td>/);
+    const dueDateMatch = row.match(
+      /Due Date[:\s]*([^<]*)|<td[^>]*>\s*(\d+\/\d+\/\d+)/i
+    );
+    const renewalsMatch = row.match(
+      /Renewals[:\s]*(\d+)|<td[^>]*>\s*(\d+)\s*<\/td>/i
+    );
+
+    if (titleMatch) {
+      const title = titleMatch[1]
+        .replace(/<[^>]*>/g, "")
+        .trim();
+      const dueDate = dueDateMatch
+        ? (dueDateMatch[1] || dueDateMatch[2] || "").trim()
+        : "N/A";
+      const renewals = renewalsMatch
+        ? parseInt(renewalsMatch[1] || renewalsMatch[2] || "0")
+        : 0;
+
+      if (title) {
+        books.push({
+          id: `book-${index}`,
+          title,
+          author: "",
+          dueDate,
+          renewalsRemaining: renewals,
+          barcode: "",
+        });
+      }
+    }
+  });
+
+  console.log(`Parsed ${books.length} checked-out books`);
+  return books;
 }
 
 export { fetchCheckedOutBooks };

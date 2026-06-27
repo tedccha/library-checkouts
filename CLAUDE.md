@@ -40,17 +40,29 @@ Visit `http://localhost:3000` and sign in with Google.
 - `app/api/checkouts/route.ts` — Server endpoint that fetches checkouts (auth-gated)
 - `app/page.tsx` — Main UI (client component)
 
-## API Integration Notes
+## Library Integration
 
-The Aspen Discovery platform (powering Chappaqua Library catalog) has a `/API/UserAPI` endpoint. We're using:
-- `login` method to authenticate and get session cookie
-- `getCheckedOutTitles` to fetch current checkouts
+The catalog runs behind Cloudflare bot protection, which blocks headless browser requests. Instead, we use authenticated session cookies:
 
-If the API doesn't work (Cloudflare blocking or changed endpoint), fallback is to:
-1. Manually import browser cookies from real Chrome session
-2. Make plain HTTP requests with those cookies
+### Getting cookies:
+1. Open https://catalog.chappaqualibrary.org in your browser and sign in
+2. Open DevTools → Application tab → Cookies
+3. Find cookies for `catalog.chappaqualibrary.org` (especially `PHPSESSID`, `aspendiscovery`)
+4. Copy all cookie values and paste into `LIBRARY_COOKIES` env var as a semicolon-separated string:
+   ```
+   LIBRARY_COOKIES=PHPSESSID=abc123; aspendiscovery=xyz789; other_cookie=value
+   ```
+5. Restart the app
 
-See `library.ts` — add fallback scraping there if needed.
+### How it works:
+- `app/lib/library.ts` — fetches the checkout page using stored session cookies
+- Parses HTML to extract book titles, due dates, renewal counts
+- HTML parsing is basic — will refine once we see the actual page structure
+
+### Cookies expire:
+- Library session cookies typically last 30 days
+- When they expire, the app will return a "cookies may be expired" error
+- Re-export fresh cookies from your browser and update `LIBRARY_COOKIES`
 
 ## Deployment (Railway)
 
