@@ -116,14 +116,17 @@ app.get('/api/books', requireAuth, async (req, res) => {
 app.get('/api/holds', requireAuth, async (req, res) => {
   try {
     console.log(`Fetching holds for ${req.user.emails[0].value}...`);
-    const holds = await fetchHolds(
-      process.env.LIBRARY_USERNAME,
-      process.env.LIBRARY_PASSWORD
-    );
+    const holds = await Promise.race([
+      fetchHolds(process.env.LIBRARY_USERNAME, process.env.LIBRARY_PASSWORD),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Holds fetch timeout')), 20000)
+      )
+    ]);
     res.json({ holds });
   } catch (error) {
-    console.error('Error:', error.message);
-    res.status(500).json({ error: error.message });
+    console.error('Holds error:', error.message);
+    // Return empty holds on error instead of failing
+    res.json({ holds: [] });
   }
 });
 

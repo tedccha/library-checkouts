@@ -423,16 +423,21 @@
         const overdue = booksData.overdue || [];
         const total = booksData.total || 0;
 
-        // Fetch holds
+        // Fetch holds (with timeout)
         let holds = [];
         try {
-          const holdsResponse = await fetch('/api/holds');
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+          const holdsResponse = await fetch('/api/holds', { signal: controller.signal });
+          clearTimeout(timeoutId);
+
           const holdsData = await holdsResponse.json();
           if (holdsResponse.ok) {
             holds = holdsData.holds || [];
           }
         } catch (e) {
-          console.log('Holds not available');
+          console.log('Holds not available:', e.message);
         }
 
         loading.style.display = 'none';
