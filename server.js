@@ -8,7 +8,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.join(__dirname, '.env.local') });
+// Only load .env.local in development (won't error if it doesn't exist)
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config({ path: path.join(__dirname, '.env.local') });
+}
 
 const app = express();
 const PORT = 3000;
