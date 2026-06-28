@@ -15,13 +15,20 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async signIn({ user }) {
-      if (!user.email) return false;
-      return allowedEmails.includes(user.email);
+      if (!user.email) {
+        console.error("[Auth] No email from provider");
+        return false;
+      }
+      const isAllowed = allowedEmails.includes(user.email);
+      console.log(`[Auth] Sign-in attempt for: ${user.email}`);
+      console.log(`[Auth] Is allowed: ${isAllowed}`);
+      console.log(`[Auth] Allowed emails: ${allowedEmails.join(", ")}`);
+      return isAllowed;
     },
   },
   pages: {
     signIn: "/",
-    error: "/",
+    error: "/auth-error",
   },
   secret: process.env.NEXTAUTH_SECRET,
 };
