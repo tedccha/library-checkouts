@@ -32,8 +32,10 @@ export const authOptions: NextAuthOptions = {
         return false;
       }
 
-      const isAllowed = allowedEmails.includes(user.email);
+      const emailLower = user.email.toLowerCase();
+      const isAllowed = allowedEmails.some(e => e.toLowerCase() === emailLower);
       console.log(`[Auth] Email: ${user.email}`);
+      console.log(`[Auth] Email (lower): ${emailLower}`);
       console.log(`[Auth] Allowed: ${isAllowed}`);
       console.log(`[Auth] Allowed list: [${allowedEmails.join(", ")}]`);
 
