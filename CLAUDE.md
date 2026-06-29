@@ -4,10 +4,10 @@ A personal web app showing library books you have checked out, with due dates an
 
 ## Architecture
 
-- **Next.js 14** with TypeScript
-- **NextAuth.js v4** for Google OAuth + email whitelist
-- **Playwright + Stealth Plugin** for headless browser automation (bypasses Cloudflare bot detection)
-- **Railway** hosting (persistent server, no serverless limitations)
+- **Express.js** server (not Next.js)
+- **Passport.js** for Google OAuth + email whitelist
+- **cloakbrowser** for headless browser automation (bypasses Cloudflare bot detection)
+- Custom browser-based web scraping for Chappaqua Library catalog
 
 ## Setup
 
@@ -21,7 +21,7 @@ cp .env.local.example .env.local
 Fill in:
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` from Google Cloud Console
 - `LIBRARY_USERNAME` / `LIBRARY_PASSWORD` from Chappaqua Library catalog
-- `NEXTAUTH_SECRET` (generate: `openssl rand -base64 32`)
+- `SESSION_SECRET` (any random string for session encryption)
 - `ALLOWED_EMAILS` (comma-separated list of Google accounts that can access the app)
 
 ### 2. Install & Run
@@ -35,45 +35,38 @@ Visit `http://localhost:3000` and sign in with Google.
 
 ## Key Files
 
-- `app/api/auth/[...nextauth]/route.ts` — Google OAuth + email whitelist
-- `app/lib/library.ts` — Aspen Discovery API client
-- `app/api/checkouts/route.ts` — Server endpoint that fetches checkouts (auth-gated)
-- `app/page.tsx` — Main UI (client component)
+- `server.js` — Express server, Google OAuth setup with Passport
+- `lib/library.js` — cloakbrowser-based scraper for Chappaqua Library catalog
+- `public/` — Frontend HTML/JS
 
 ## Library Integration
 
-The Chappaqua Library catalog runs behind Cloudflare bot protection. We use **Playwright with a stealth plugin** to:
-- Mimic a real browser (defeats Cloudflare detection)
-- Automatically handle login
+The Chappaqua Library catalog is protected by **Cloudflare bot detection**. We use **cloakbrowser** to:
+- Launch a headless browser with anti-detection features
+- Mimic real browser behavior to bypass Cloudflare challenges
+- Automatically log in with library credentials
 - Extract book data from the checkout page
 
 ### How it works:
-1. Playwright launches a headless Chromium browser
-2. Stealth plugin patches the browser fingerprint to avoid Cloudflare bot detection
-3. Logs into the library with your credentials
-4. Navigates to the checkouts page
-5. Parses HTML to extract: title, due date, renewal count
-6. Returns data to the API
+1. cloakbrowser launches a headless Chrome with stealth mode enabled
+2. Logs into the library with your credentials
+3. Navigates to the checkouts page
+4. Waits for Cloudflare Turnstile challenge to complete
+5. Parses HTML to extract: title, author, due date, renewal count
+6. Returns JSON via `/api/books` endpoint
 
 ### Setup:
 - Add `LIBRARY_USERNAME` and `LIBRARY_PASSWORD` to `.env.local`
 - The app stores nothing — credentials are used only for each request
-- No sessions, no cookie expiration to worry about
+- Browser instance is reused across requests for performance
 
 ### Performance:
-- First fetch takes ~10-15s (browser startup)
-- Subsequent fetches reuse the same browser context (~3-5s)
-- Browser instance is kept alive for fast subsequent calls
-
-## Deployment (Railway)
-
-1. Push to GitHub (new repo)
-2. Link to Railway via dashboard
-3. Add env vars in Railway settings
-4. Deploy
+- First fetch takes ~15-20s (browser startup + Cloudflare)
+- Subsequent fetches reuse the same browser instance (~5-10s)
+- Browser remains alive between requests
 
 ## Notes
 
-- Cloudflare blocks headless browsers on the library catalog, so we use API/HTTP instead of Playwright
+- We use cloakbrowser (not Playwright) because Playwright was blocked by Cloudflare
 - Family members can sign in with their own Google account if added to `ALLOWED_EMAILS`
 - Library credentials are server-only (never exposed to browser)
