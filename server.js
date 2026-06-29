@@ -23,7 +23,7 @@ app.use(express.static('public'));
 app.use(session({
   secret: process.env.SESSION_SECRET || 'dev-secret-key',
   resave: false,
-  saveUninitialized: false,
+  saveUninitialized: true,
   cookie: { secure: process.env.NODE_ENV === 'production', httpOnly: true }
 }));
 
@@ -38,10 +38,17 @@ passport.use(new GoogleStrategy(
     const allowedEmails = (process.env.ALLOWED_EMAILS || 'tedcha@gmail.com').split(',').map(e => e.trim().toLowerCase());
     const userEmail = profile.emails[0].value.toLowerCase();
 
+    console.log(`[Auth] Google email: ${profile.emails[0].value}`);
+    console.log(`[Auth] Normalized email: ${userEmail}`);
+    console.log(`[Auth] Allowed emails: [${allowedEmails.join(', ')}]`);
+    console.log(`[Auth] Match: ${allowedEmails.includes(userEmail)}`);
+
     if (!allowedEmails.includes(userEmail)) {
+      console.log(`[Auth] REJECTED: ${userEmail} not in allowlist`);
       return done(null, false, { message: 'Email not authorized' });
     }
 
+    console.log(`[Auth] ACCEPTED: ${userEmail}`);
     return done(null, profile);
   }
 ));
