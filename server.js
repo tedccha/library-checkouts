@@ -91,20 +91,20 @@ app.get('/auth/google',
 app.get('/api/auth/callback/google',
   passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
-    console.log('[Callback] User authenticated:', req.user.emails[0].value);
-    console.log('[Callback] Old Session ID:', req.sessionID);
+    const email = req.user.emails[0].value;
+    console.log('[Callback] User authenticated:', email);
+    console.log('[Callback] Session ID before:', req.sessionID);
 
-    // Regenerate session after successful authentication (prevents session fixation)
-    req.session.regenerate((err) => {
-      if (err) {
-        console.error('[Callback] Session regenerate error:', err);
-        return res.status(500).json({ error: 'Session regeneration failed' });
-      }
-
-      console.log('[Callback] New Session ID:', req.sessionID);
-      console.log('[Callback] Redirecting to /');
-      res.redirect('/');
+    // Manually set cookie to test if cookies work at all
+    res.cookie('connect.sid', req.sessionID, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 86400000 // 24 hours
     });
+
+    console.log('[Callback] Manually set cookie. Redirecting to /');
+    res.redirect('/');
   }
 );
 
