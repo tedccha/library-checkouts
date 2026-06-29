@@ -15,9 +15,6 @@ RUN apt-get update && apt-get install -y \
   libxss1 \
   libxtst6 \
   libnss3 \
-  libgconf-2-4 \
-  libappindicator1 \
-  libindicator7 \
   libdrm2 \
   libgbm1 \
   libasound2 \
@@ -30,6 +27,7 @@ RUN apt-get update && apt-get install -y \
   libxkbcommon0 \
   libfreetype6 \
   libfontconfig1 \
+  libexpat1 \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
