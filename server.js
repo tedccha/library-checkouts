@@ -93,7 +93,9 @@ app.get('/api/auth/callback/google',
   (req, res) => {
     console.log('[Callback] User authenticated:', req.user.emails[0].value);
     console.log('[Callback] Session ID:', req.sessionID);
-    console.log('[Callback] Saving session...');
+
+    // Mark session as modified so express-session sends the Set-Cookie header
+    req.session.touch();
 
     req.session.save((err) => {
       if (err) {
@@ -101,8 +103,7 @@ app.get('/api/auth/callback/google',
         return res.status(500).json({ error: 'Session save failed' });
       }
 
-      console.log('[Callback] Session saved successfully');
-      console.log('[Callback] Redirecting to /');
+      console.log('[Callback] Session saved and cookie will be sent');
       res.redirect('/');
     });
   }
