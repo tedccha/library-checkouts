@@ -22,11 +22,12 @@ app.use(express.static('public'));
 
 // Session setup with file-based store
 const FileStore = SessionStore(session);
+const sessionDir = path.join(__dirname, '.sessions');
 app.use(session({
   secret: process.env.SESSION_SECRET || 'dev-secret-key',
   resave: false,
   saveUninitialized: true,
-  store: new FileStore({ path: '/tmp/sessions' }),
+  store: new FileStore({ path: sessionDir }),
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
@@ -90,10 +91,18 @@ app.get('/auth/google',
 app.get('/api/auth/callback/google',
   passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
+    console.log('[Callback] User authenticated:', req.user.emails[0].value);
+    console.log('[Callback] Session ID:', req.sessionID);
+    console.log('[Callback] Saving session...');
+
     req.session.save((err) => {
       if (err) {
-        console.error('Session save error:', err);
+        console.error('[Callback] Session save error:', err);
+        return res.status(500).json({ error: 'Session save failed' });
       }
+
+      console.log('[Callback] Session saved successfully');
+      console.log('[Callback] Redirecting to /');
       res.redirect('/');
     });
   }
