@@ -88,12 +88,14 @@ app.get('/auth/google',
 app.get('/api/auth/callback/google',
   passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
+    console.log('[Callback] Handler reached. req.user:', req.user ? req.user.emails[0].value : 'undefined');
     // req.user is set by passport.authenticate, now explicitly save to session
     req.login(req.user, (err) => {
       if (err) {
         console.error('[Callback] Login error:', err);
         return res.redirect('/');
       }
+      console.log('[Callback] req.login succeeded, redirecting');
       res.redirect('/');
     });
   }
