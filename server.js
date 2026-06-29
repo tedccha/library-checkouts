@@ -42,6 +42,16 @@ app.use(session({
   }
 }));
 
+// Middleware to log session activity
+app.use((req, res, next) => {
+  const origSend = res.send;
+  res.send = function(data) {
+    console.log('[Session] Response headers:', res.getHeaders());
+    return origSend.call(this, data);
+  };
+  next();
+});
+
 // Passport setup (without session middleware)
 passport.use(new GoogleStrategy(
   {
@@ -84,12 +94,17 @@ function requireAuth(req, res, next) {
 
 // Routes (API endpoints)
 app.get('/api/user', (req, res) => {
-  console.log('[/api/user] Session ID:', req.sessionID);
-  console.log('[/api/user] req.user:', req.user);
-  console.log('[/api/user] Session contents:', req.session);
+  console.log('[Step 6] /api/user request received');
+  console.log('[Step 6] Request cookies:', req.cookies);
+  console.log('[Step 6] Session ID:', req.sessionID);
+  console.log('[Step 6] Session object after middleware loaded:', req.session);
+  console.log('[Step 6] req.user after middleware loaded:', req.user);
+
   if (req.user) {
+    console.log('[Step 9] User authenticated:', req.user.emails[0].value);
     res.json({ user: req.user.emails[0].value });
   } else {
+    console.log('[Step 9] User NOT authenticated');
     res.json({ user: null });
   }
 });
@@ -101,15 +116,30 @@ app.get('/auth/google',
 app.get('/api/auth/callback/google',
   passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
-    console.log('[Callback] After passport.authenticate, req.user:', req.user.emails[0].value);
+    console.log('[Step 1] After passport.authenticate, req.user:', req.user.emails[0].value);
+    console.log('[Step 1] Session ID before login:', req.sessionID);
+
     req.login(req.user, (err) => {
       if (err) {
-        console.log('[Callback] req.login error:', err);
+        console.log('[Step 3] req.login error:', err);
         return res.redirect('/');
       }
-      console.log('[Callback] Session ID after login:', req.sessionID);
-      console.log('[Callback] Session contents:', req.session);
-      res.redirect('/');
+
+      console.log('[Step 3] req.login callback reached');
+      console.log('[Step 3] Session ID after login:', req.sessionID);
+      console.log('[Step 3] Session object:', req.session);
+      console.log('[Step 3] req.user after login:', req.user.emails[0].value);
+
+      // Force save session explicitly
+      req.session.save((saveErr) => {
+        if (saveErr) {
+          console.log('[Step 4] Session save error:', saveErr);
+          return res.redirect('/');
+        }
+        console.log('[Step 4] Session saved to DB');
+        console.log('[Step 4] Response will include Set-Cookie header:', res.getHeader('set-cookie'));
+        res.redirect('/');
+      });
     });
   }
 );
