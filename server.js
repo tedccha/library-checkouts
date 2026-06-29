@@ -58,8 +58,15 @@ passport.use(new GoogleStrategy(
   }
 ));
 
-passport.serializeUser((user, done) => done(null, user));
-passport.deserializeUser((user, done) => done(null, user));
+passport.serializeUser((user, done) => {
+  console.log('[Passport] serializeUser called:', user.emails[0].value);
+  done(null, user);
+});
+
+passport.deserializeUser((user, done) => {
+  console.log('[Passport] deserializeUser called with:', user ? user.emails[0].value : 'null');
+  done(null, user);
+});
 
 app.use(passport.initialize());
 app.use(passport.session());
