@@ -74,6 +74,7 @@ function requireAuth(req, res, next) {
 
 // Routes (API endpoints)
 app.get('/api/user', (req, res) => {
+  console.log('[/api/user] Called. req.user:', req.user ? req.user.emails[0].value : 'null');
   if (req.user) {
     res.json({ user: req.user.emails[0].value });
   } else {
