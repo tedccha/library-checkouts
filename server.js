@@ -77,8 +77,9 @@ function requireAuth(req, res, next) {
 
 // Routes (API endpoints)
 app.get('/api/user', (req, res) => {
-  if (req.user) {
-    res.json({ user: req.user.emails[0].value });
+  const user = req.session?.user || req.user;
+  if (user) {
+    res.json({ user: user.emails[0].value });
   } else {
     res.json({ user: null });
   }
@@ -93,9 +94,12 @@ app.get('/api/auth/callback/google',
   (req, res) => {
     const email = req.user.emails[0].value;
     console.log('[Callback] User authenticated:', email);
-    console.log('[Callback] Session ID before:', req.sessionID);
+    console.log('[Callback] Storing user in session...');
 
-    // Manually set cookie to test if cookies work at all
+    // Explicitly store user in session (marks session as modified)
+    req.session.user = req.user;
+
+    // Now set cookie with the session ID
     res.cookie('connect.sid', req.sessionID, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -103,8 +107,15 @@ app.get('/api/auth/callback/google',
       maxAge: 86400000 // 24 hours
     });
 
-    console.log('[Callback] Manually set cookie. Redirecting to /');
-    res.redirect('/');
+    // Save session to ensure user data is persisted
+    req.session.save((err) => {
+      if (err) {
+        console.error('[Callback] Session save error:', err);
+        return res.status(500).json({ error: 'Session save failed' });
+      }
+      console.log('[Callback] User stored in session. Redirecting to /');
+      res.redirect('/');
+    });
   }
 );
 
