@@ -83,7 +83,12 @@ app.get('/auth/google',
 app.get('/api/auth/callback/google',
   passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
-    res.redirect('/');
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+      }
+      res.redirect('/');
+    });
   }
 );
 
