@@ -92,18 +92,17 @@ app.get('/api/auth/callback/google',
   passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
     console.log('[Callback] User authenticated:', req.user.emails[0].value);
-    console.log('[Callback] Session ID:', req.sessionID);
+    console.log('[Callback] Old Session ID:', req.sessionID);
 
-    // Mark session as modified so express-session sends the Set-Cookie header
-    req.session.touch();
-
-    req.session.save((err) => {
+    // Regenerate session after successful authentication (prevents session fixation)
+    req.session.regenerate((err) => {
       if (err) {
-        console.error('[Callback] Session save error:', err);
-        return res.status(500).json({ error: 'Session save failed' });
+        console.error('[Callback] Session regenerate error:', err);
+        return res.status(500).json({ error: 'Session regeneration failed' });
       }
 
-      console.log('[Callback] Session saved and cookie will be sent');
+      console.log('[Callback] New Session ID:', req.sessionID);
+      console.log('[Callback] Redirecting to /');
       res.redirect('/');
     });
   }
