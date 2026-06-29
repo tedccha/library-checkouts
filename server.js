@@ -58,15 +58,8 @@ passport.use(new GoogleStrategy(
   }
 ));
 
-passport.serializeUser((user, done) => {
-  console.log('[Passport] serializeUser called:', user.emails[0].value);
-  done(null, user);
-});
-
-passport.deserializeUser((user, done) => {
-  console.log('[Passport] deserializeUser called with:', user ? user.emails[0].value : 'null');
-  done(null, user);
-});
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((user, done) => done(null, user));
 
 app.use(passport.initialize());
 app.use(passport.session());
@@ -81,7 +74,6 @@ function requireAuth(req, res, next) {
 
 // Routes (API endpoints)
 app.get('/api/user', (req, res) => {
-  console.log('[/api/user] Called. req.user:', req.user ? req.user.emails[0].value : 'null');
   if (req.user) {
     res.json({ user: req.user.emails[0].value });
   } else {
@@ -96,12 +88,14 @@ app.get('/auth/google',
 app.get('/api/auth/callback/google',
   passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
-    const email = req.user.emails[0].value;
-    console.log('[Callback] User authenticated:', email);
-    console.log('[Callback] Session ID:', req.sessionID);
-    console.log('[Callback] Session contents:', JSON.stringify(req.session, null, 2));
-    console.log('[Callback] Redirecting to /');
-    res.redirect('/');
+    // req.user is set by passport.authenticate, now explicitly save to session
+    req.login(req.user, (err) => {
+      if (err) {
+        console.error('[Callback] Login error:', err);
+        return res.redirect('/');
+      }
+      res.redirect('/');
+    });
   }
 );
 
