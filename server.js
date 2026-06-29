@@ -1,7 +1,9 @@
 import express from 'express';
 import session from 'express-session';
+import pgSession from 'connect-pg-simple';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import pg from 'pg';
 import dotenv from 'dotenv';
 import { fetchCheckedOutBooks, fetchHolds } from './lib/library.js';
 import path from 'path';
@@ -16,23 +18,31 @@ if (process.env.NODE_ENV !== 'production') {
 const app = express();
 const PORT = 3000;
 
+// PostgreSQL connection for session store
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL
+});
+
+const PgSession = pgSession(session);
+
 // Serve static files
 app.use(express.static('public'));
 
-// Session setup - using MemoryStore for now to test auth flow
-// TODO: Switch to persistent store (Redis, database) for production
+// Session setup with PostgreSQL store
 app.use(session({
+  store: new PgSession({ pool }),
   secret: process.env.SESSION_SECRET || 'dev-secret-key',
   resave: false,
-  saveUninitialized: true,
+  saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    maxAge: 86400000 // 24 hours
   }
 }));
 
-// Passport setup
+// Passport setup (without session middleware)
 passport.use(new GoogleStrategy(
   {
     clientID: process.env.GOOGLE_CLIENT_ID,
@@ -90,11 +100,7 @@ app.get('/api/auth/callback/google',
   (req, res) => {
     req.login(req.user, (err) => {
       if (err) return res.redirect('/');
-      // Explicitly save session to trigger Set-Cookie header
-      req.session.save((saveErr) => {
-        if (saveErr) return res.redirect('/');
-        res.redirect('/');
-      });
+      res.redirect('/');
     });
   }
 );
