@@ -77,6 +77,11 @@ function requireAuth(req, res, next) {
 
 // Routes (API endpoints)
 app.get('/api/user', (req, res) => {
+  console.log('[/api/user] Session ID:', req.sessionID);
+  console.log('[/api/user] Session data:', JSON.stringify(req.session));
+  console.log('[/api/user] req.user:', req.user);
+  console.log('[/api/user] req.session.user:', req.session?.user);
+
   const user = req.session?.user || req.user;
   if (user) {
     res.json({ user: user.emails[0].value });
