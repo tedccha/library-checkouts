@@ -74,9 +74,6 @@ function requireAuth(req, res, next) {
 
 // Routes (API endpoints)
 app.get('/api/user', (req, res) => {
-  console.log('[/api/user] Session ID:', req.sessionID);
-  console.log('[/api/user] Session contents:', JSON.stringify(req.session, null, 2));
-  console.log('[/api/user] req.user:', req.user ? req.user.emails[0].value : 'null');
   if (req.user) {
     res.json({ user: req.user.emails[0].value });
   } else {
@@ -91,17 +88,13 @@ app.get('/auth/google',
 app.get('/api/auth/callback/google',
   passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
-    console.log('[Callback] Handler reached. req.user:', req.user ? req.user.emails[0].value : 'undefined');
-    // req.user is set by passport.authenticate, now explicitly save to session
     req.login(req.user, (err) => {
-      if (err) {
-        console.error('[Callback] Login error:', err);
-        return res.redirect('/');
-      }
-      console.log('[Callback] req.login succeeded');
-      console.log('[Callback] Session ID:', req.sessionID);
-      console.log('[Callback] Session contents:', JSON.stringify(req.session, null, 2));
-      res.redirect('/');
+      if (err) return res.redirect('/');
+      // Explicitly save session to trigger Set-Cookie header
+      req.session.save((saveErr) => {
+        if (saveErr) return res.redirect('/');
+        res.redirect('/');
+      });
     });
   }
 );
