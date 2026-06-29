@@ -1,6 +1,5 @@
 import express from 'express';
 import session from 'express-session';
-import SessionStore from 'session-file-store';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import dotenv from 'dotenv';
@@ -20,14 +19,12 @@ const PORT = 3000;
 // Serve static files
 app.use(express.static('public'));
 
-// Session setup with file-based store
-const FileStore = SessionStore(session);
-const sessionDir = path.join(__dirname, '.sessions');
+// Session setup - using MemoryStore for now to test auth flow
+// TODO: Switch to persistent store (Redis, database) for production
 app.use(session({
   secret: process.env.SESSION_SECRET || 'dev-secret-key',
   resave: false,
   saveUninitialized: true,
-  store: new FileStore({ path: sessionDir }),
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
@@ -77,14 +74,8 @@ function requireAuth(req, res, next) {
 
 // Routes (API endpoints)
 app.get('/api/user', (req, res) => {
-  console.log('[/api/user] Session ID:', req.sessionID);
-  console.log('[/api/user] Session data:', JSON.stringify(req.session));
-  console.log('[/api/user] req.user:', req.user);
-  console.log('[/api/user] req.session.user:', req.session?.user);
-
-  const user = req.session?.user || req.user;
-  if (user) {
-    res.json({ user: user.emails[0].value });
+  if (req.user) {
+    res.json({ user: req.user.emails[0].value });
   } else {
     res.json({ user: null });
   }
@@ -99,28 +90,9 @@ app.get('/api/auth/callback/google',
   (req, res) => {
     const email = req.user.emails[0].value;
     console.log('[Callback] User authenticated:', email);
-    console.log('[Callback] Storing user in session...');
-
-    // Explicitly store user in session (marks session as modified)
-    req.session.user = req.user;
-
-    // Now set cookie with the session ID
-    res.cookie('connect.sid', req.sessionID, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 86400000 // 24 hours
-    });
-
-    // Save session to ensure user data is persisted
-    req.session.save((err) => {
-      if (err) {
-        console.error('[Callback] Session save error:', err);
-        return res.status(500).json({ error: 'Session save failed' });
-      }
-      console.log('[Callback] User stored in session. Redirecting to /');
-      res.redirect('/');
-    });
+    console.log('[Callback] Session ID:', req.sessionID);
+    console.log('[Callback] Redirecting to /');
+    res.redirect('/');
   }
 );
 
