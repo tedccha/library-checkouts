@@ -117,9 +117,18 @@ app.get('/api/books', requireAuth, async (req, res) => {
 });
 
 app.get('/api/holds', requireAuth, async (req, res) => {
-  // Holds feature disabled - browser session reuse needs optimization
-  // TODO: Fix browser timeout issues and re-enable
-  res.json({ holds: [] });
+  try {
+    console.log(`Fetching holds for ${req.user.emails[0].value}...`);
+    const holds = await fetchHolds(
+      process.env.LIBRARY_USERNAME,
+      process.env.LIBRARY_PASSWORD
+    );
+
+    res.json({ holds });
+  } catch (error) {
+    console.error('Error fetching holds:', error.message);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.get('/logout', (req, res) => {
