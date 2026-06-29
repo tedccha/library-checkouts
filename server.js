@@ -35,9 +35,10 @@ passport.use(new GoogleStrategy(
     callbackURL: `${process.env.CALLBACK_URL || 'http://localhost:3000'}/api/auth/callback/google`
   },
   (accessToken, refreshToken, profile, done) => {
-    const allowedEmails = (process.env.ALLOWED_EMAILS || 'tedcha@gmail.com').split(',').map(e => e.trim());
+    const allowedEmails = (process.env.ALLOWED_EMAILS || 'tedcha@gmail.com').split(',').map(e => e.trim().toLowerCase());
+    const userEmail = profile.emails[0].value.toLowerCase();
 
-    if (!allowedEmails.includes(profile.emails[0].value)) {
+    if (!allowedEmails.includes(userEmail)) {
       return done(null, false, { message: 'Email not authorized' });
     }
 
