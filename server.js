@@ -99,6 +99,7 @@ app.get('/api/auth/callback/google',
     const email = req.user.emails[0].value;
     console.log('[Callback] User authenticated:', email);
     console.log('[Callback] Session ID:', req.sessionID);
+    console.log('[Callback] Session contents:', JSON.stringify(req.session, null, 2));
     console.log('[Callback] Redirecting to /');
     res.redirect('/');
   }
