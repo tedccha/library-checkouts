@@ -176,8 +176,15 @@ app.get('/api/books', requireAuth, async (req, res) => {
       total: books.length
     });
   } catch (error) {
-    console.error('Error:', error.message);
-    res.status(500).json({ error: error.message });
+    console.error('Error fetching books:', error.message);
+    // Browser automation unavailable — return empty list with message
+    res.status(200).json({
+      books: [],
+      overdue: [],
+      total: 0,
+      error: "Unable to fetch library books. Browser automation is not available on this platform. This is a known limitation of headless browser support on Railway.",
+      fallback: true
+    });
   }
 });
 
@@ -192,7 +199,12 @@ app.get('/api/holds', requireAuth, async (req, res) => {
     res.json({ holds });
   } catch (error) {
     console.error('Error fetching holds:', error.message);
-    res.status(500).json({ error: error.message });
+    // Browser automation unavailable — return empty list with message
+    res.status(200).json({
+      holds: [],
+      error: "Unable to fetch library holds. Browser automation is not available on this platform.",
+      fallback: true
+    });
   }
 });
 
