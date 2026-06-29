@@ -1,5 +1,6 @@
 import express from 'express';
 import session from 'express-session';
+import SessionStore from 'session-file-store';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import dotenv from 'dotenv';
@@ -19,11 +20,13 @@ const PORT = 3000;
 // Serve static files
 app.use(express.static('public'));
 
-// Session setup
+// Session setup with file-based store
+const FileStore = SessionStore(session);
 app.use(session({
   secret: process.env.SESSION_SECRET || 'dev-secret-key',
   resave: false,
   saveUninitialized: true,
+  store: new FileStore({ path: '/tmp/sessions' }),
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
